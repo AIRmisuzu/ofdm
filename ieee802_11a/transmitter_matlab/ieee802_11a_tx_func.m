@@ -6,44 +6,42 @@ sim_options.upsample=upsample;
 sim_options.ConvCodeRate='R3/4';
 sim_options.Modulation='64QAM';
 
-%% data generation
+%% 数据生成
 in_byte_col(:,1)=in_byte;
-in_bits_1=de2bi(in_byte_col,8);
+in_bits_1=de2bi(in_byte_col,8); %转换成比特数据
 in_bits_r=in_bits_1(:,8:-1:1);
 in_bits_re=in_bits_r.';
 in_bits_s=in_bits_re(:);
 in_bits(1,:)=in_bits_s;
-ret=crc32(in_bits);
-inf_bits=[in_bits ret.'];
+ret=crc32(in_bits); %计算crc校验值
+inf_bits=[in_bits ret.']; %得到完整的数据
 service=zeros(1,16);
-data_bits=tx_generate_data(inf_bits,service,sim_options);
-%% scramble
+%数据成帧 添加16bit业务位以及6bit的尾比特，和填充比特用于保证帧结构
+data_bits=tx_generate_data(inf_bits,service,sim_options); 
+%% 添加扰码
 scramble_int=[1,1,1,1,0,0,0];
 scramble_bits=scramble_lc(scramble_int,data_bits,sim_options);
-%% rs coding and punc
+%% 2 1 7卷积编码，使用802.11固定的卷积编码方案
 coded_bit_stream = tx_conv_encoder(scramble_bits); 
+%% 打孔 每六个中删除两个数据
 tx_bits = tx_puncture(coded_bit_stream, sim_options.ConvCodeRate);
 rdy_to_mod_bits =tx_bits;
-%% interleave
+%% 交织
 rdy_to_mod_bits = tx_interleaver(rdy_to_mod_bits,sim_options.Modulation);
-%% Modulate
+%% 调制
 mod_syms = tx_modulate(rdy_to_mod_bits, sim_options.Modulation);
-%% Add pilot symbols
+%% 插入导频
 mod_ofdm_syms = tx_add_pilot_syms(mod_syms);
-%% Tx symbols to time domain
+%% ifft
 time_syms = tx_freqd_to_timed(mod_ofdm_syms,sim_options.upsample);
-%% Add cyclic prefix
+%% 添加保护间隔
 time_signal = tx_add_cyclic_prefix(time_syms,sim_options.upsample);
-%% Construction of the preamble
+%% 添加训练符号
 preamble = tx_gen_preamble(sim_options);
-%% signal generate
+%% 生成帧头信号
 l_sig=tx_gen_sig(sim_options);
-%% joint frame
+%% 数据成帧
 tx_11a=[preamble l_sig time_signal].';
-t=0:1:length(tx_11a)-1;
-lo_data1=exp(1j*2*pi*t*0.0002)';
-lo_data2=exp(1j*2*pi*t*0.0001)';
-tx_11a=tx_11a.*lo_data1.*0.07+tx_11a.*lo_data2.*0.03+tx_11a.*0.9;
 %% psd
 pwelch(tx_11a,[],[],[],20e6*sim_options.upsample,'centered','psd');
 %% fir

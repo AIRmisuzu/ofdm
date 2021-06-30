@@ -1,4 +1,4 @@
-% 	Convolutional encoding with unipolar data
+% 	卷积编码
 function coded_bits = tx_conv_encoder(in_bits)
 global sim_consts;
 number_rows = size(sim_consts.ConvCodeGenPoly, 1);
@@ -11,5 +11,6 @@ for row=1:number_rows
 end
 uncoded_bits1=uncoded_bits(:,1:length(in_bits));
 coded_bits=uncoded_bits1(:);
+a=1
 
 

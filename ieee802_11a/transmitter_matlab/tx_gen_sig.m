@@ -18,6 +18,7 @@ switch sim_options.rate
         sig_rate=[0,0,1,1];
 end
 sig_length_bit=dec2bin(sim_options.PacketLength,12);
+% 低位在前，高位在后，故需要转换传输顺序
 for i=1:12
 	sig_len(i)=str2double(sig_length_bit(13-i));
 end

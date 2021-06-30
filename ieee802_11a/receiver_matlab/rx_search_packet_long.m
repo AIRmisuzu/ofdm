@@ -12,6 +12,11 @@ for j=1:end_search-L*2
     rx_cross_ratio(j)=rx_cross_corr(j)./rx_self_corr(j);
 end
 index=find(rx_cross_ratio>0.4);
+figure(6);clf;
+set(gcf,'name','细同步');
+subplot(311);plot(rx_cross_corr);
+subplot(312);plot(rx_cross_ratio);
+subplot(313);plot(index);
 figure(3);clf;
 if length(index)>=2
     if index(2)<index(1)+48 && index(2)>=index(1)+4
@@ -21,8 +26,13 @@ if length(index)>=2
     end
     plot(rx_cross_ratio(1:thres_idx+64),'r');
 else
-    thres_idx(i)=end_search;
+    thres_idx=end_search;
     plot(rx_cross_ratio(1:thres_idx),'r');
 end
+figure(6);clf;
+set(gcf,'name','细同步');
+subplot(311);plot(rx_cross_corr);
+subplot(312);plot(rx_cross_ratio);
+subplot(313);plot(index);
 figure(1);
 

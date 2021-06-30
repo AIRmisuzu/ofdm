@@ -57,6 +57,7 @@ elseif ~isempty(findstr(modulation, '64QAM'))
    inp=reshape(bits_in,6,full_len/6);
    
    mod_symbols=table([32 16 8 4 2 1]*inp+1);  % maps transmitted bits into 64QAM symbol
+   a=1
 else
    error('Unimplemented modulation');
 end

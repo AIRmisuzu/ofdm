@@ -4,17 +4,8 @@ cyc=0;err_cyc=0;
 viterbi='soft';
 %% srrc
 flt1=rcosine(1,upsample,'fir/sqrt',1,64);
-rx_signal_40=rcosflt(rx_signal_40,1,1, 'filter', flt1);
+%rx_signal_40=rcosflt(rx_signal_40,1,1, 'filter', flt1);
 rx_signal(:,1)=rx_signal_40(1:upsample:end);
-%% Decimation
-% rx_signal(:,1)=rx_signal_40(1:1:end);
-%% srrc
-% rx_signal1=round((rx_signal_40(1:end-1,:)+rx_signal_40(2:end,:))./2);
-% rx_signal=[];
-% rx_signal=rx_signal1(1:2:end,1); 
-% if size(rx_signal1,2)==2
-%    rx_signal2=rx_signal1(1:2:end,2); 
-% end
 while (1)
 tic;
 %% plot pwelch
@@ -32,7 +23,7 @@ else
     break;
 end
 %% packet search
-[dc_offset,thres_idx] = rx_search_packet_short_fpga3(rx_signal);
+[dc_offset,thres_idx] = rx_search_packet_short3(rx_signal);
 disp(['thres_idx_short=',num2str(thres_idx)]);
 if thres_idx>=length(rx_signal)-32
     break;
@@ -55,7 +46,7 @@ end
 rx_signal_coarse=rx_signal_coarse_sync;
 freq_est_short=0;
 %% Fine time synchronization
-end_search=5000;
+end_search=500;
 thres_idx_fine = rx_search_packet_long(end_search,rx_signal_coarse);
 if thres_idx_fine~=end_search
     rx_signal_fine_sync = rx_signal_coarse(thres_idx_fine+32:end);
@@ -64,8 +55,6 @@ else
     disp('short sync error');
     continue;
 end
-% [a7 a8]=textread('E:\code\ieee802_11a\receiver_v_vivado\txt\packet_search_long.dat');
-% rx_signal_fine_sync=a7+1i*a8;
 subplot(244);
 if length(rx_signal_fine_sync)>320
     plot(abs(rx_signal_fine_sync(1:320)));
@@ -76,18 +65,8 @@ title('精同步信号时域波形');
 disp(['sync_index=',num2str(thres_idx),'+',num2str(thres_idx_fine),'=',num2str(thres_idx+thres_idx_fine)]);
 %% Frequency error estimation and correction
 [rx_signal_fine, freq_est] = rx_frequency_sync_long(rx_signal_fine_sync);
-% rx_signal_fine=rx_signal_fine_sync;
-% [a77 a78]=textread('E:\code\ieee802_11a\receiver_v_vivado\txt\freq_sync_long.dat');
-% rx_signal_fine=a77+1i*a78;
 %% Return to frequency domain
 [freq_tr_syms,  freq_data] = rx_timed_to_freqd(rx_signal_fine);
-% [a9 a10]=textread('E:\code\ieee802_11a\receiver_v_vivado\txt\rx_fft_tr.dat');
-% rx_fft_tr=(a9+1i*a10).*2^3;
-% freq_tr_syms=reshape(rx_fft_tr,52,2);
-% [a11 a12]=textread('E:\code\ieee802_11a\receiver_v_vivado\txt\rx_fft_data.dat');
-% rx_fft_data=(a11+1i*a12).*2^3;
-% frame=floor(length(rx_fft_data)./52);
-% freq_data=reshape(rx_fft_data(1:52*frame),52,frame);
 %% Channel estimation
 channel_est = rx_estimate_channel(freq_tr_syms);
 subplot(245);
@@ -98,32 +77,18 @@ chan_data=freq_data.*conj(channel_est_data);
 chan_data_amp=abs(channel_est_data(sim_consts.DataSubcPatt,:)).^2;
 chan_data_syms=chan_data(sim_consts.DataSubcPatt,:);
 chan_pilot_syms=chan_data(sim_consts.PilotSubcPatt,:);
-% [a13 a14]=textread('E:\code\ieee802_11a\receiver_v_vivado\txt\data_eq.dat');
-% data_eq=(a13+1i*a14);
-% frame=floor(length(data_eq)./48);
-% chan_data_syms=reshape(data_eq(1:48*frame),48,frame);
-% [a15 a16]=textread('E:\code\ieee802_11a\receiver_v_vivado\txt\pilot_eq.dat');
-% pilot_eq=(a15+1i*a16);
-% chan_pilot_syms=reshape(pilot_eq(1:4*frame),4,frame);
-% [abs2]=textread('E:\code\ieee802_11a\receiver_v_vivado\txt\abs2.dat');
-% chan_data_amp=repmat(abs2(1:48),1,frame);
 %% Phase tracker, returns phase error corrected symbols
-[correction_phases,phase_error] = rx_pilot_phase_est1(chan_data_syms,chan_pilot_syms);
-% correction_phases = rx_pilot_phase_est(chan_data_syms,chan_pilot_syms);
-freq_data_syms = chan_data_syms.*exp(-1i.*correction_phases(sim_consts.DataSubcPatt,:));
-% [a17 a18]=textread('E:\code\ieee802_11a\receiver_v_vivado\txt\phase_tracker.dat');
-% data_pt=(a17+1i*a18);
-% frame=floor(length(data_pt)./48);
-% freq_data_syms=reshape(data_pt(1:48*frame),48,frame);
-% [abs2]=textread('E:\code\ieee802_11a\receiver_v_vivado\txt\abs2.dat');
-% chan_data_amp=repmat(abs2(1:48).*2^9,1,frame);
+[correction_phases,phase_error] = rx_pilot_phase_est(chan_data_syms,chan_pilot_syms);
+%freq_data_syms = chan_data_syms.*exp(-1i.*correction_phases(sim_consts.DataSubcPatt,:));
+freq_data_syms = chan_data_syms;
 %% signal
 %get the signal part
 freq_signal_syms=freq_data_syms(:,1);
 % Demodulate
-[signal_soft_bits,evm_signal]=rx_demodulate_dynamic_soft(freq_signal_syms,chan_data_amp(:,1),'BPSK');
 % Deinterleave 
-signal_deint_bits = rx_deinterleave(signal_soft_bits,'BPSK');
+[soft_bits,evm_signal] = rx_bpsk_demod_dynamic_soft(freq_signal_syms,chan_data_amp(:,1));
+soft_bits=soft_bits(:)';
+signal_deint_bits = rx_deinterleave(soft_bits,'BPSK');
 % depuncture
 [signal_depunc_bits,signal_erase] = rx_depuncture(signal_deint_bits,'R1/2');
 % Vitervi decoding
@@ -183,7 +148,7 @@ bits=inf_bits(1:length(inf_bits)-32);
 bits_r=reshape(bits,8,length(bits)/8).';
 data_byte=bi2de(bits_r,'left-msb');
 %use crc to detect the "receiving" inf_bits
-ret=crc32_new(inf_bits(1:length(inf_bits)-32)).';
+ret=crc32(inf_bits(1:length(inf_bits)-32)).';
 crc_bits=inf_bits(length(inf_bits)-31:length(inf_bits));
 crc_outputs=sum(xor(ret,crc_bits),2);
 if crc_outputs==0
